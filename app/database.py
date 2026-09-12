@@ -27,7 +27,8 @@ def init_db():
             event TEXT NOT NULL,
             action TEXT,
             issue_number INTEGER,
-            timestamp TEXT NOT NULL
+            timestamp TEXT NOT NULL,
+            UNIQUE(delivery_id, action)
         )
         """
     )
