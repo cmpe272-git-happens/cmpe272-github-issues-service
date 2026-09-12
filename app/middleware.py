@@ -5,7 +5,6 @@ import uuid
 
 from fastapi import Request
 
-
 logger = logging.getLogger("github_issues_service")
 
 SERVICE_NAME = "github-issues-service"
