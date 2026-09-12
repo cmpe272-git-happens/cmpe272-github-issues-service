@@ -1,10 +1,13 @@
 from fastapi import FastAPI
 
+from app.logging_config import configure_logging
 from app.middleware import request_id_middleware
 from app.routes.events import router as events_router
 from app.routes.health import router as health_router
 from app.routes.issues import router as issues_router
 from app.routes.webhook import router as webhook_router
+
+configure_logging()
 
 app = FastAPI(
     title="GitHub Issues Service",
