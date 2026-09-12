@@ -1,19 +1,63 @@
+import json
 import logging
+import time
 import uuid
 
 from fastapi import Request
 
-
 logger = logging.getLogger("github_issues_service")
+
+SERVICE_NAME = "github-issues-service"
 
 
 async def request_id_middleware(request: Request, call_next):
-    request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
+    request_id = request.headers.get(
+        "X-Request-ID",
+        str(uuid.uuid4()),
+    )
 
     request.state.request_id = request_id
 
-    response = await call_next(request)
+    start_time = time.perf_counter()
 
-    response.headers["X-Request-ID"] = request_id
+    try:
+        response = await call_next(request)
 
-    return response
+        latency_ms = round(
+            (time.perf_counter() - start_time) * 1000,
+            2,
+        )
+
+        log_data = {
+            "service": SERVICE_NAME,
+            "request_id": request_id,
+            "method": request.method,
+            "endpoint": request.url.path,
+            "status": response.status_code,
+            "latency_ms": latency_ms,
+        }
+
+        logger.info(json.dumps(log_data))
+
+        response.headers["X-Request-ID"] = request_id
+
+        return response
+
+    except Exception:
+        latency_ms = round(
+            (time.perf_counter() - start_time) * 1000,
+            2,
+        )
+
+        log_data = {
+            "service": SERVICE_NAME,
+            "request_id": request_id,
+            "method": request.method,
+            "endpoint": request.url.path,
+            "status": 500,
+            "latency_ms": latency_ms,
+        }
+
+        logger.exception(json.dumps(log_data))
+
+        raise
