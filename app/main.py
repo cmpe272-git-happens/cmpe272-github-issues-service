@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+from app.database import init_db
+
 from fastapi import FastAPI
 
 from app.logging_config import configure_logging
@@ -7,6 +10,8 @@ from app.routes.health import router as health_router
 from app.routes.issues import router as issues_router
 from app.routes.webhook import router as webhook_router
 
+load_dotenv()
+init_db()
 configure_logging()
 
 app = FastAPI(
