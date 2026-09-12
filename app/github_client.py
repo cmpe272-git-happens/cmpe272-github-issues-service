@@ -1,25 +1,39 @@
-from typing import Any
+from typing import Any, Optional
 
 import httpx
 
 from app.config import settings
 
+class GitHubAPIError(Exception):
+    def __init__(self, status_code: int, message: str):
+        self.status_code = status_code
+        self.message = message
+        super().__init__(message)
+
+
+class GitHubRateLimitError(GitHubAPIError):
+    def __init__(self, reset_at=None):
+        super().__init__(
+            status_code=429,
+            message="GitHub API rate limit exceeded",
+        )
+        self.reset_at = reset_at
 
 class GitHubClient:
     BASE_URL = "https://api.github.com"
 
     def __init__(
         self,
-        token: str | None = None,
-        owner: str | None = None,
-        repo: str | None = None,
+        token: Optional[str] = None,
+        owner: Optional[str] = None,
+        repo: Optional[str] = None,
     ):
         self.token = token or settings.github_token
         self.owner = owner or settings.github_owner
         self.repo = repo or settings.github_repo
 
     @property
-    def headers(self) -> dict[str, str]:
+    def headers(self) -> dict:
         return {
             "Accept": "application/vnd.github+json",
             "Authorization": f"Bearer {self.token}",
@@ -30,33 +44,43 @@ class GitHubClient:
     def issues_url(self) -> str:
         return f"{self.BASE_URL}/repos/{self.owner}/{self.repo}/issues"
 
-    async def list_issues(self) -> Any:
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                self.issues_url,
-                headers=self.headers,
-            )
+    async def list_issues(
+        self,
+        page: int = 1,
+        per_page: int = 30,
+    ):
+        params = {
+            "page": page,
+            "per_page": per_page,
+            "state": "open",
+        }
 
-        response.raise_for_status()
-        return response.json()
+        response = await self._request(
+            "GET",
+            self.issues_url,
+            params=params,
+        )
 
-    async def get_issue(self, issue_number: int) -> Any:
+        return {
+            "data": response.json(),
+            "links": response.headers.get("Link"),
+        }
+
+    async def get_issue(self, issue_number: int):
         url = f"{self.issues_url}/{issue_number}"
 
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                url,
-                headers=self.headers,
-            )
+        response = await self._request(
+            "GET",
+            url,
+        )
 
-        response.raise_for_status()
         return response.json()
 
     async def create_issue(
         self,
         title: str,
-        body: str | None = None,
-    ) -> Any:
+        body: Optional[str] = None,
+    ):
         payload = {
             "title": title,
         }
@@ -64,23 +88,21 @@ class GitHubClient:
         if body is not None:
             payload["body"] = body
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                self.issues_url,
-                headers=self.headers,
-                json=payload,
-            )
+        response = await self._request(
+            "POST",
+            self.issues_url,
+            json=payload,
+        )
 
-        response.raise_for_status()
         return response.json()
 
     async def update_issue(
         self,
         issue_number: int,
-        title: str | None = None,
-        body: str | None = None,
-        state: str | None = None,
-    ) -> Any:
+        title: Optional[str] = None,
+        body: Optional[str] = None,
+        state: Optional[str] = None,
+    ):
         payload = {}
 
         if title is not None:
@@ -94,14 +116,12 @@ class GitHubClient:
 
         url = f"{self.issues_url}/{issue_number}"
 
-        async with httpx.AsyncClient() as client:
-            response = await client.patch(
-                url,
-                headers=self.headers,
-                json=payload,
-            )
+        response = await self._request(
+            "PATCH",
+            url,
+            json=payload,
+        )
 
-        response.raise_for_status()
         return response.json()
 
     async def close_issue(self, issue_number: int) -> Any:
@@ -110,31 +130,66 @@ class GitHubClient:
             state="closed",
         )
 
-        async def list_comments(self, issue_number: int) -> Any:
+    async def list_comments(self, issue_number: int):
         url = f"{self.issues_url}/{issue_number}/comments"
 
-        async with httpx.AsyncClient() as client:
-            response = await client.get(
-                url,
-                headers=self.headers,
-            )
+        response = await self._request(
+            "GET",
+            url,
+        )
 
-        response.raise_for_status()
         return response.json()
 
     async def create_comment(
         self,
         issue_number: int,
         body: str,
-    ) -> Any:
+    ):
         url = f"{self.issues_url}/{issue_number}/comments"
 
+        response = await self._request(
+            "POST",
+            url,
+            json={"body": body},
+        )
+
+        return response.json()
+
+    async def _request(
+        self,
+        method: str,
+        url: str,
+        **kwargs
+    ):
         async with httpx.AsyncClient() as client:
-            response = await client.post(
+            response = await client.request(
+                method,
                 url,
                 headers=self.headers,
-                json={"body": body},
+                **kwargs,
             )
 
-        response.raise_for_status()
-        return response.json()
+        if response.status_code == 403:
+            remaining = response.headers.get("X-RateLimit-Remaining")
+
+            if remaining == "0":
+                reset_at = response.headers.get("X-RateLimit-Reset")
+                raise GitHubRateLimitError(reset_at)
+
+        if response.status_code >= 400:
+            try:
+                error_data = response.json()
+                message = error_data.get(
+                    "message",
+                    "GitHub API request failed",
+                )
+            except Exception:
+                message = "GitHub API request failed"
+
+            raise GitHubAPIError(
+                status_code=response.status_code,
+                message=message,
+            )
+
+        return response
+    
