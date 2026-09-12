@@ -8,15 +8,20 @@ import hashlib
 import hmac
 import json
 import os
-
 from datetime import datetime, timezone
-from app.database import save_event
+
 from fastapi import APIRouter, Header, HTTPException, Request, Response
+
+from app.database import save_event
 
 router = APIRouter(prefix="/webhook", tags=["Webhooks"])
 
 
 def verify_signature(payload: bytes, signature: str | None) -> bool:
+    """
+    Verify that the webhook request really came from GitHub.
+    """
+
     webhook_secret = os.getenv("WEBHOOK_SECRET")
 
     if not webhook_secret:
@@ -31,7 +36,10 @@ def verify_signature(payload: bytes, signature: str | None) -> bool:
         hashlib.sha256,
     ).hexdigest()
 
-    return hmac.compare_digest(expected_signature, signature)
+    return hmac.compare_digest(
+        expected_signature,
+        signature,
+    )
 
 
 @router.post("")
@@ -44,19 +52,26 @@ async def receive_webhook(
     x_github_event: str | None = Header(
         default=None,
         alias="X-GitHub-Event",
-    ),x_github_delivery: str | None = Header(
+    ),
+    x_github_delivery: str | None = Header(
         default=None,
         alias="X-GitHub-Delivery",
     ),
 ):
+    # Read the exact raw body GitHub sent.
     payload_bytes = await request.body()
 
-    if not verify_signature(payload_bytes, x_hub_signature_256):
+    # 1. Verify that the request really came from GitHub.
+    if not verify_signature(
+        payload_bytes,
+        x_hub_signature_256,
+    ):
         raise HTTPException(
             status_code=401,
             detail="Invalid webhook signature",
         )
 
+    # 2. Only accept events required by the assignment.
     allowed_events = {
         "issues",
         "issue_comment",
@@ -69,9 +84,14 @@ async def receive_webhook(
             detail="Unsupported GitHub event",
         )
 
-    if x_github_event == "ping":
-        return Response(status_code=204)
+    # 3. Every GitHub delivery should have a unique delivery ID.
+    if not x_github_delivery:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing GitHub delivery ID",
+        )
 
+    # 4. Parse the JSON payload.
     try:
         payload = json.loads(payload_bytes)
     except json.JSONDecodeError:
@@ -80,22 +100,24 @@ async def receive_webhook(
             detail="Invalid JSON payload",
         )
 
-    action = payload.get("action")
+    # 5. Decide the action and issue number.
+    if x_github_event == "ping":
+        # GitHub ping payloads do not have normal issue actions.
+        action = "ping"
+        issue_number = None
 
-    if not action:
-        raise HTTPException(
-            status_code=400,
-            detail="Missing webhook action",
-        )
+    else:
+        action = payload.get("action")
 
-    if not x_github_delivery:
-        raise HTTPException(
-            status_code=400,
-            detail="Missing GitHub delivery ID",
-        )
+        if not action:
+            raise HTTPException(
+                status_code=400,
+                detail="Missing webhook action",
+            )
 
-    issue_number = payload.get("issue", {}).get("number")
+        issue_number = payload.get("issue", {}).get("number")
 
+    # 6. Store the webhook event.
     timestamp = datetime.now(timezone.utc).isoformat()
 
     save_event(
@@ -106,4 +128,5 @@ async def receive_webhook(
         timestamp=timestamp,
     )
 
+    # 7. Acknowledge quickly.
     return Response(status_code=204)
