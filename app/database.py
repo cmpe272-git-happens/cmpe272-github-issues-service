@@ -7,7 +7,7 @@ Author: Sukruti Shah
 
 import sqlite3
 from pathlib import Path
-
+from typing import Optional
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
@@ -40,8 +40,8 @@ def init_db():
 def save_event(
     delivery_id: str,
     event: str,
-    action: str | None,
-    issue_number: int | None,
+    action: Optional[str],
+    issue_number: Optional[int],
     timestamp: str,
 ) -> bool:
     connection = sqlite3.connect(str(DB_PATH))
