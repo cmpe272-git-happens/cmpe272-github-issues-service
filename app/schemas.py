@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 class IssueCreate(BaseModel):
     title: str = Field(..., min_length=1)
     body: Optional[str] = None
+    labels: Optional[list[str]] = None
 
 
 class IssueUpdate(BaseModel):

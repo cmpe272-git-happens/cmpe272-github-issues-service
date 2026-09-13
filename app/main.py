@@ -22,6 +22,21 @@ app = FastAPI(
     description="A service wrapper around the GitHub Issues REST API",
     version="1.0.0",
 )
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request,
+    exc: RequestValidationError,
+):
+    return JSONResponse(
+        status_code=400,
+        content={
+            "code": "VALIDATION_ERROR",
+            "message": "Request validation failed.",
+            "details": {
+                "errors": jsonable_encoder(exc.errors())
+            },
+        },
+    )
 
 app.middleware("http")(request_id_middleware)
 
