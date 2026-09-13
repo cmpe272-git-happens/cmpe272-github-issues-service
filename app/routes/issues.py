@@ -1,11 +1,12 @@
 from typing import Literal, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, HTTPException, Query, Request, Response
 
 from app.github_client import (
     GitHubAPIError,
     GitHubClient,
     GitHubRateLimitError,
+    etags_match,
 )
 from app.schemas import CommentCreate, IssueCreate, IssueUpdate
 
@@ -17,10 +18,12 @@ github_client = GitHubClient()
 
 # ---------------------------------------------------------
 # GET /issues
-# List issues with pagination, filtering, and Link headers
+# List issues with pagination, filtering, Link headers,
+# rate-limit headers, and ETag / Conditional GET support
 # ---------------------------------------------------------
 @router.get("")
 async def list_issues(
+    request: Request,
     response: Response,
     state: Literal["open", "closed", "all"] = Query("open"),
     labels: Optional[str] = Query(None),
@@ -28,32 +31,83 @@ async def list_issues(
     per_page: int = Query(30, ge=1, le=100),
 ):
     try:
+        # Read If-None-Match sent by the client
+        if_none_match = request.headers.get("If-None-Match")
+
+        # Forward conditional GET header to GitHub
         github_response = await github_client.list_issues(
             state=state,
             labels=labels,
             page=page,
             per_page=per_page,
+            if_none_match=if_none_match,
         )
 
+        # Get ETag returned by GitHub
+        etag = github_response.headers.get("ETag")
+
+        # Collect GitHub rate-limit information to include in responses
+        rate_limit_headers = {}
+        for header_name in (
+            "X-RateLimit-Limit",
+            "X-RateLimit-Remaining",
+            "X-RateLimit-Reset",
+        ):
+            val = github_response.headers.get(header_name)
+            if val:
+                rate_limit_headers[header_name] = val
+
+        # -------------------------------------------------
+        # Conditional GET / 304 Not Modified
+        # -------------------------------------------------
+
+        # Case 1:
+        # GitHub directly returned 304
+        if github_response.status_code == 304:
+            headers = {**rate_limit_headers}
+
+            if etag:
+                headers["ETag"] = etag
+            elif if_none_match:
+                headers["ETag"] = if_none_match
+
+            return Response(
+                status_code=304,
+                headers=headers,
+            )
+
+        # Case 2:
+        # GitHub returned 200, but the ETag still matches
+        # one of the values sent by the client (weak comparison per RFC 7232 / RFC 9110).
+        if if_none_match and etag and etags_match(if_none_match, etag):
+            headers = {
+                **rate_limit_headers,
+                "ETag": etag,
+            }
+            return Response(
+                status_code=304,
+                headers=headers,
+            )
+
+        # -------------------------------------------------
+        # Forward GitHub ETag header on normal 200 response
+        # -------------------------------------------------
+        if etag:
+            response.headers["ETag"] = etag
+
+        # -------------------------------------------------
         # Forward GitHub pagination Link header
+        # -------------------------------------------------
         link_header = github_response.headers.get("Link")
 
         if link_header:
             response.headers["Link"] = link_header
 
+        # -------------------------------------------------
         # Forward useful GitHub rate-limit information
-        rate_limit = github_response.headers.get("X-RateLimit-Limit")
-        rate_remaining = github_response.headers.get("X-RateLimit-Remaining")
-        rate_reset = github_response.headers.get("X-RateLimit-Reset")
-
-        if rate_limit:
-            response.headers["X-RateLimit-Limit"] = rate_limit
-
-        if rate_remaining:
-            response.headers["X-RateLimit-Remaining"] = rate_remaining
-
-        if rate_reset:
-            response.headers["X-RateLimit-Reset"] = rate_reset
+        # -------------------------------------------------
+        for header_name, header_val in rate_limit_headers.items():
+            response.headers[header_name] = header_val
 
         return github_response.json()
 

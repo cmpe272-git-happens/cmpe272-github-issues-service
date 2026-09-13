@@ -1,7 +1,10 @@
 from dotenv import load_dotenv
 from app.database import init_db
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from app.logging_config import configure_logging
 from app.middleware import request_id_middleware
@@ -21,6 +24,17 @@ app = FastAPI(
 )
 
 app.middleware("http")(request_id_middleware)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request,
+    exc: RequestValidationError,
+):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": jsonable_encoder(exc.errors())},
+    )
 
 app.include_router(health_router)
 app.include_router(issues_router)
