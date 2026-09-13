@@ -8,10 +8,12 @@ class IssueCreate(BaseModel):
     body: Optional[str] = None
     labels: Optional[list[str]] = None
 
+
 class IssueUpdate(BaseModel):
     title: Optional[str] = None
     body: Optional[str] = None
     state: Optional[Literal["open", "closed"]] = None
+
 
 class CommentCreate(BaseModel):
     body: str = Field(..., min_length=1)

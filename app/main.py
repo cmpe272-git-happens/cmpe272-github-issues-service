@@ -40,6 +40,17 @@ async def validation_exception_handler(
 
 app.middleware("http")(request_id_middleware)
 
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request,
+    exc: RequestValidationError,
+):
+    return JSONResponse(
+        status_code=400,
+        content={"detail": jsonable_encoder(exc.errors())},
+    )
+
 app.include_router(health_router)
 app.include_router(issues_router)
 app.include_router(webhook_router)
