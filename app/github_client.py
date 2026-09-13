@@ -4,6 +4,7 @@ import httpx
 
 from app.config import settings
 
+
 class GitHubAPIError(Exception):
     def __init__(self, status_code: int, message: str):
         self.status_code = status_code
@@ -12,12 +13,18 @@ class GitHubAPIError(Exception):
 
 
 class GitHubRateLimitError(GitHubAPIError):
-    def __init__(self, reset_at=None):
+    def __init__(
+        self,
+        reset_at: Optional[str] = None,
+        retry_after: Optional[str] = None,
+    ):
         super().__init__(
             status_code=429,
             message="GitHub API rate limit exceeded",
         )
         self.reset_at = reset_at
+        self.retry_after = retry_after
+
 
 class GitHubClient:
     BASE_URL = "https://api.github.com"
@@ -42,18 +49,26 @@ class GitHubClient:
 
     @property
     def issues_url(self) -> str:
-        return f"{self.BASE_URL}/repos/{self.owner}/{self.repo}/issues"
+        return (
+            f"{self.BASE_URL}/repos/"
+            f"{self.owner}/{self.repo}/issues"
+        )
 
     async def list_issues(
         self,
+        state: str = "open",
+        labels: Optional[str] = None,
         page: int = 1,
         per_page: int = 30,
     ):
         params = {
+            "state": state,
             "page": page,
             "per_page": per_page,
-            "state": "open",
         }
+
+        if labels:
+            params["labels"] = labels
 
         response = await self._request(
             "GET",
@@ -61,12 +76,12 @@ class GitHubClient:
             params=params,
         )
 
-        return {
-            "data": response.json(),
-            "links": response.headers.get("Link"),
-        }
+        return response
 
-    async def get_issue(self, issue_number: int):
+    async def get_issue(
+        self,
+        issue_number: int,
+    ):
         url = f"{self.issues_url}/{issue_number}"
 
         response = await self._request(
@@ -124,14 +139,23 @@ class GitHubClient:
 
         return response.json()
 
-    async def close_issue(self, issue_number: int) -> Any:
+    async def close_issue(
+        self,
+        issue_number: int,
+    ) -> Any:
         return await self.update_issue(
             issue_number=issue_number,
             state="closed",
         )
 
-    async def list_comments(self, issue_number: int):
-        url = f"{self.issues_url}/{issue_number}/comments"
+    async def list_comments(
+        self,
+        issue_number: int,
+    ):
+        url = (
+            f"{self.issues_url}/"
+            f"{issue_number}/comments"
+        )
 
         response = await self._request(
             "GET",
@@ -145,12 +169,17 @@ class GitHubClient:
         issue_number: int,
         body: str,
     ):
-        url = f"{self.issues_url}/{issue_number}/comments"
+        url = (
+            f"{self.issues_url}/"
+            f"{issue_number}/comments"
+        )
 
         response = await self._request(
             "POST",
             url,
-            json={"body": body},
+            json={
+                "body": body,
+            },
         )
 
         return response.json()
@@ -159,7 +188,7 @@ class GitHubClient:
         self,
         method: str,
         url: str,
-        **kwargs
+        **kwargs,
     ):
         async with httpx.AsyncClient() as client:
             response = await client.request(
@@ -169,20 +198,38 @@ class GitHubClient:
                 **kwargs,
             )
 
-        if response.status_code == 403:
-            remaining = response.headers.get("X-RateLimit-Remaining")
+        # GitHub can signal rate limiting with 403 or 429.
+        if response.status_code in (403, 429):
+            remaining = response.headers.get(
+                "X-RateLimit-Remaining"
+            )
 
-            if remaining == "0":
-                reset_at = response.headers.get("X-RateLimit-Reset")
-                raise GitHubRateLimitError(reset_at)
+            if (
+                response.status_code == 429
+                or remaining == "0"
+            ):
+                reset_at = response.headers.get(
+                    "X-RateLimit-Reset"
+                )
+
+                retry_after = response.headers.get(
+                    "Retry-After"
+                )
+
+                raise GitHubRateLimitError(
+                    reset_at=reset_at,
+                    retry_after=retry_after,
+                )
 
         if response.status_code >= 400:
             try:
                 error_data = response.json()
+
                 message = error_data.get(
                     "message",
                     "GitHub API request failed",
                 )
+
             except Exception:
                 message = "GitHub API request failed"
 
@@ -192,4 +239,3 @@ class GitHubClient:
             )
 
         return response
-    
