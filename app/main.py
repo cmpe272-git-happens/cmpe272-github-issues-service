@@ -1,7 +1,10 @@
 from dotenv import load_dotenv
 from app.database import init_db
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 
 from app.logging_config import configure_logging
 from app.middleware import request_id_middleware
@@ -19,6 +22,21 @@ app = FastAPI(
     description="A service wrapper around the GitHub Issues REST API",
     version="1.0.0",
 )
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(
+    request: Request,
+    exc: RequestValidationError,
+):
+    return JSONResponse(
+        status_code=400,
+        content={
+            "code": "VALIDATION_ERROR",
+            "message": "Request validation failed.",
+            "details": {
+                "errors": jsonable_encoder(exc.errors())
+            },
+        },
+    )
 
 app.middleware("http")(request_id_middleware)
 
