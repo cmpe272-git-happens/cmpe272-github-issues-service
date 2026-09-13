@@ -156,6 +156,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+.venv/
 
 # Spyder project settings
 .spyderproject
@@ -238,6 +239,7 @@ htmlcov/
 *.db
 *.sqlite
 *.sqlite3
+data/events.db
 
 # macOS
 .DS_Store
