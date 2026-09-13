@@ -57,10 +57,15 @@ def test_valid_signature(monkeypatch):
 
     monkeypatch.setenv("WEBHOOK_SECRET", TEST_SECRET)
 
-    # Pretend SQLite successfully saved the event.
+    saved_event = {}
+
+    def fake_save_event(**kwargs):
+        saved_event.update(kwargs)
+        return True
+
     monkeypatch.setattr(
         "app.routes.webhook.save_event",
-        lambda **kwargs: True,
+        fake_save_event,
     )
 
     body = b'{"action":"opened","issue":{"number":1}}'
@@ -78,6 +83,11 @@ def test_valid_signature(monkeypatch):
     )
 
     assert response.status_code == 204
+    assert saved_event["delivery_id"] == "delivery-001"
+    assert saved_event["event"] == "issues"
+    assert saved_event["action"] == "opened"
+    assert saved_event["issue_number"] == 1
+    assert saved_event["timestamp"]
 
 
 def test_invalid_signature(monkeypatch):
@@ -94,6 +104,24 @@ def test_invalid_signature(monkeypatch):
             "X-GitHub-Event": "issues",
             "X-GitHub-Delivery": "delivery-002",
             "X-Hub-Signature-256": "sha256=wrong",
+            "Content-Type": "application/json",
+        },
+    )
+
+    assert response.status_code == 401
+
+
+def test_missing_signature(monkeypatch):
+    """A webhook without a signature should return 401."""
+
+    monkeypatch.setenv("WEBHOOK_SECRET", TEST_SECRET)
+
+    response = client.post(
+        "/webhook",
+        content=b'{"action":"opened","issue":{"number":1}}',
+        headers={
+            "X-GitHub-Event": "issues",
+            "X-GitHub-Delivery": "delivery-missing-signature",
             "Content-Type": "application/json",
         },
     )
@@ -152,6 +180,27 @@ def test_unknown_event(monkeypatch):
     assert response.status_code == 400
 
 
+def test_missing_delivery_id(monkeypatch):
+    """A recognized event without a delivery ID should return 400."""
+
+    monkeypatch.setenv("WEBHOOK_SECRET", TEST_SECRET)
+
+    body = b'{"action":"opened","issue":{"number":1}}'
+    signature = make_signature(body)
+
+    response = client.post(
+        "/webhook",
+        content=body,
+        headers={
+            "X-GitHub-Event": "issues",
+            "X-Hub-Signature-256": signature,
+            "Content-Type": "application/json",
+        },
+    )
+
+    assert response.status_code == 400
+
+
 def test_missing_action(monkeypatch):
     """
     Issues event without an action should return 400.
@@ -168,6 +217,50 @@ def test_missing_action(monkeypatch):
         headers={
             "X-GitHub-Event": "issues",
             "X-GitHub-Delivery": "delivery-005",
+            "X-Hub-Signature-256": signature,
+            "Content-Type": "application/json",
+        },
+    )
+
+    assert response.status_code == 400
+
+
+def test_issue_comment_missing_action(monkeypatch):
+    """An issue_comment event without an action should return 400."""
+
+    monkeypatch.setenv("WEBHOOK_SECRET", TEST_SECRET)
+
+    body = b'{"issue":{"number":1}}'
+    signature = make_signature(body)
+
+    response = client.post(
+        "/webhook",
+        content=body,
+        headers={
+            "X-GitHub-Event": "issue_comment",
+            "X-GitHub-Delivery": "delivery-missing-comment-action",
+            "X-Hub-Signature-256": signature,
+            "Content-Type": "application/json",
+        },
+    )
+
+    assert response.status_code == 400
+
+
+def test_malformed_json(monkeypatch):
+    """Malformed JSON should return 400."""
+
+    monkeypatch.setenv("WEBHOOK_SECRET", TEST_SECRET)
+
+    body = b'{"action":"opened"'
+    signature = make_signature(body)
+
+    response = client.post(
+        "/webhook",
+        content=body,
+        headers={
+            "X-GitHub-Event": "issues",
+            "X-GitHub-Delivery": "delivery-malformed-json",
             "X-Hub-Signature-256": signature,
             "Content-Type": "application/json",
         },
@@ -258,6 +351,8 @@ def test_issue_comment(monkeypatch):
     assert saved_event["event"] == "issue_comment"
     assert saved_event["action"] == "created"
     assert saved_event["issue_number"] == 10
+    assert saved_event["delivery_id"] == "delivery-006"
+    assert saved_event["timestamp"]
 
 
 def test_ping(monkeypatch):
@@ -297,6 +392,8 @@ def test_ping(monkeypatch):
     assert saved_event["event"] == "ping"
     assert saved_event["action"] == "ping"
     assert saved_event["issue_number"] is None
+    assert saved_event["delivery_id"] == "delivery-ping"
+    assert saved_event["timestamp"]
 
 
 def test_duplicate_retry_returns_success(monkeypatch):
