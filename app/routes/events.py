@@ -13,6 +13,6 @@ router = APIRouter(prefix="/events", tags=["Events"])
 
 @router.get("")
 def list_events(
-    limit: int = Query(default=50, ge=1, le=100),
+    limit: int = Query(default=20, ge=1, le=100),
 ):
     return get_events(limit)

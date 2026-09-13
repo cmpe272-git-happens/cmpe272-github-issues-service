@@ -176,6 +176,51 @@ def test_missing_action(monkeypatch):
     assert response.status_code == 400
 
 
+def test_unknown_action(monkeypatch):
+    """Unsupported actions should be rejected before persistence."""
+
+    monkeypatch.setenv("WEBHOOK_SECRET", TEST_SECRET)
+
+    body = b'{"action":"made_up_action","issue":{"number":1}}'
+    signature = make_signature(body)
+
+    response = client.post(
+        "/webhook",
+        content=body,
+        headers={
+            "X-GitHub-Event": "issues",
+            "X-GitHub-Delivery": "delivery-unknown-action",
+            "X-Hub-Signature-256": signature,
+            "Content-Type": "application/json",
+        },
+    )
+
+    assert response.status_code == 400
+    assert response.json()["detail"] == "Unsupported webhook action"
+
+
+def test_malformed_issue_payload(monkeypatch):
+    """Malformed issue objects should return 400 instead of 500."""
+
+    monkeypatch.setenv("WEBHOOK_SECRET", TEST_SECRET)
+
+    body = b'{"action":"opened","issue":null}'
+    signature = make_signature(body)
+
+    response = client.post(
+        "/webhook",
+        content=body,
+        headers={
+            "X-GitHub-Event": "issues",
+            "X-GitHub-Delivery": "delivery-malformed-issue",
+            "X-Hub-Signature-256": signature,
+            "Content-Type": "application/json",
+        },
+    )
+
+    assert response.status_code == 400
+
+
 def test_issue_comment(monkeypatch):
     """
     issue_comment event should be accepted.
