@@ -7,6 +7,7 @@ on:
   pull_request:
     branches:
       - dev
+      - main
 
 permissions:
   contents: read
@@ -36,7 +37,7 @@ jobs:
   docker:
     name: Build and Publish Docker Image
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
 
     steps:
