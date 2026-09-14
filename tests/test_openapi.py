@@ -1,4 +1,14 @@
-# juilee
+"""
+Tests for the OpenAPI 3.1 contract.
+
+These tests verify that the FastAPI application exposes the required
+OpenAPI version, API routes, and reusable schemas.
+
+The tests help ensure that the generated API documentation matches
+the service contract.
+
+Author: Juilee Giramkar
+"""
 from pathlib import Path
 
 import yaml

@@ -21,7 +21,8 @@ class IssueCreate(BaseModel):
     body: Optional[str] = None
     labels: Optional[list[str]] = None
 
-
+# Restricts issue state values to open or closed.
+# Validation contribution by Juilee Giramkar.
 class IssueUpdate(BaseModel):
     title: Optional[str] = None
     body: Optional[str] = None

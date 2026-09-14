@@ -11,6 +11,8 @@ The application:
 * registers the health, issues, webhook, and events routers.
 
 Author: Thanzeel Hassan
+Contributor: Juilee Giramkar
+* includes validation error handling contributed by Juilee Giramkar.
 """
 
 from dotenv import load_dotenv
@@ -39,6 +41,8 @@ app = FastAPI(
     description="A service wrapper around the GitHub Issues REST API",
     version="1.0.0",
 )
+# Converts FastAPI validation errors from 422 to the required 400 response.
+# Validation contribution by Juilee Giramkar.
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(

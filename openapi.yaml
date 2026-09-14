@@ -1,3 +1,8 @@
+# OpenAPI 3.1 contract for the GitHub Issues Service.
+# Documents issue CRUD, comments, webhooks, events, health checks,
+# reusable schemas, error responses, pagination, and security.
+# Author: Juilee Giramkar
+
 openapi: 3.1.0
 info:
   title: GitHub Issues Gateway API

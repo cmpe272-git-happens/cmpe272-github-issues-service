@@ -1,4 +1,15 @@
-# juilee
+"""
+Mocked unit tests for the GitHub API client.
+
+These tests verify request headers, URL construction, issue CRUD
+operations, comment operations, GitHub API error handling, and
+rate-limit behavior.
+
+External GitHub requests are mocked so the tests run safely without
+depending on the live GitHub API.
+
+Author: Juilee Giramkar
+"""
 import asyncio
 
 import httpx
