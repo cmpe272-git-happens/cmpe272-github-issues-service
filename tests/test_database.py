@@ -1,4 +1,21 @@
-# sukruti
+"""
+Persistence tests for the SQLite webhook event store.
+
+These tests verify that:
+- database initialization creates the expected events table;
+- webhook events are persisted and remain available across SQLite connections;
+- duplicate deliveries are rejected and stored only once;
+- ping events can be stored without an issue number;
+- get_events() respects result limits and returns newest events first;
+- an empty database returns an empty list; and
+- unexpected SQLite integrity errors are not silently suppressed.
+
+Each test uses a temporary isolated SQLite database via pytest's tmp_path
+fixture, so the application's real data/events.db file is never modified.
+
+Author: Sukruti Shah
+"""
+
 import sqlite3
 
 import pytest

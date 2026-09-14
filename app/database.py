@@ -1,5 +1,17 @@
 """
-SQLite storage for webhook events.
+SQLite persistence layer for GitHub webhook events.
+
+This module is responsible for:
+- creating and initializing the local events database;
+- opening SQLite connections with bounded lock timeouts;
+- retrying short-lived database lock errors;
+- persisting webhook events safely;
+- rejecting duplicate webhook deliveries;
+- surfacing unexpected database integrity errors; and
+- returning the most recent processed events for the /events endpoint.
+
+Webhook events are stored in data/events.db by default. The database path can
+be mounted to persistent storage when the application runs inside Docker.
 
 Author: Sukruti Shah
 """
