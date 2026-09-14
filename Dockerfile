@@ -1,3 +1,14 @@
+# Docker configuration for the GitHub Issues Service.
+#
+# This Dockerfile:
+# * uses Python 3.14 slim as the base image;
+# * installs the application's Python dependencies;
+# * copies the FastAPI application into the container;
+# * exposes port 8000; and
+# * starts the application with Uvicorn.
+#
+# Author: Thanzeel Hassan
+
 FROM python:3.14-slim
 
 WORKDIR /app
