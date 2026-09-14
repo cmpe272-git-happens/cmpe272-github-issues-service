@@ -2,6 +2,11 @@
 
 A FastAPI service that wraps the GitHub Issues REST API for the CMPE 272 project.
 
+## Documentation
+
+- [Design Note](DESIGN_NOTE.md)
+- [OpenAPI Specification](openapi.yaml)
+
 ## Repositories
 
 **Service repository:**  
