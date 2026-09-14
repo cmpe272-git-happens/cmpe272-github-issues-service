@@ -1,3 +1,16 @@
+"""
+Request ID and structured logging middleware for the GitHub Issues Service.
+
+The middleware:
+* generates a unique request ID when one is not provided by the client;
+* preserves an existing ``X-Request-ID`` header;
+* records the HTTP method, endpoint, status code, and request latency;
+* includes the request ID in the response headers; and
+* logs unexpected exceptions with a 500 status and request context.
+
+Author: Thanzeel Hassan
+"""
+
 import json
 import logging
 import time
