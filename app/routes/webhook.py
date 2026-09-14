@@ -1,5 +1,21 @@
 """
-GitHub webhook receiver and HMAC verification.
+GitHub webhook receiver, validation, and persistence handler.
+
+This module is responsible for:
+- receiving GitHub webhook deliveries at POST /webhook;
+- verifying HMAC SHA-256 signatures using WEBHOOK_SECRET;
+- performing constant-time signature comparison;
+- accepting supported GitHub events such as issues, issue_comment, and ping;
+- validating webhook actions, payload structure, and issue numbers;
+- persisting valid webhook deliveries to the SQLite event store;
+- handling duplicate deliveries safely for retry/idempotency behavior;
+- returning 503 when persistence is temporarily unavailable;
+- emitting structured logs for accepted and rejected webhook deliveries; and
+- acknowledging successfully processed webhooks with HTTP 204.
+
+The handler is designed to reject malformed or unsupported webhook payloads
+with clear client errors while keeping successful processing lightweight and
+retry-safe.
 
 Author: Sukruti Shah
 """

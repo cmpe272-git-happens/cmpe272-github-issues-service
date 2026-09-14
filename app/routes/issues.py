@@ -1,4 +1,16 @@
-# Navaneeth 
+"""
+GitHub Issues API Routes
+
+Handles GitHub issue operations including:
+* listing and retrieving issues;
+* creating, updating, and closing issues;
+* listing and creating issue comments;
+* pagination and filtering;
+* ETag / Conditional GET support;
+* GitHub rate-limit and API error handling.
+
+Author: Navaneeth Puklath
+"""
 from typing import Literal, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request, Response

@@ -1,4 +1,15 @@
-# juilee
+"""
+Mocked tests for the GitHub Issues API routes.
+
+These tests verify issue listing, creation, retrieval, updating,
+closing, comment operations, pagination headers, GitHub API errors,
+and rate-limit responses.
+
+The GitHub client is mocked so route behavior can be tested
+independently from the external GitHub service.
+
+Author: Juilee Giramkar
+"""
 import httpx
 import pytest
 

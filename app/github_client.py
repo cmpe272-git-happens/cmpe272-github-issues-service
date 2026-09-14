@@ -1,4 +1,19 @@
-# Navaneeth
+"""
+GitHub API Client
+
+Provides communication between the FastAPI service and GitHub API.
+
+Features:
+* retrieves, creates, updates, and closes GitHub issues;
+* lists and creates issue comments;
+* supports pagination and issue filtering;
+* implements ETag / Conditional GET handling;
+* handles GitHub rate limits and API errors;
+* manages authenticated HTTP requests to GitHub.
+
+Author: Navaneeth Puklath
+"""
+
 from typing import Any, Optional
 
 import httpx
