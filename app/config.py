@@ -13,7 +13,7 @@ Author: Thanzeel Hassan
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 
 class Settings:

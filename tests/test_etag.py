@@ -1,5 +1,19 @@
-"""Focused pytest tests for ETag and Conditional GET support on GET /issues."""
-# navaneeth
+"""
+ETag and Conditional GET Test Suite
+
+Tests ETag and Conditional GET functionality for the GitHub Issues API.
+
+Covers:
+* ETag normalization and formatting;
+* weak and strong ETag comparison;
+* If-None-Match request handling;
+* 200 OK and 304 Not Modified responses;
+* GitHub rate-limit header forwarding;
+* pagination and Link header handling;
+* request ID validation.
+
+Author: Navaneeth Puklath
+"""
 
 from unittest.mock import AsyncMock
 import httpx
